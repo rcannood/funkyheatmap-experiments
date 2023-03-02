@@ -1,4 +1,4 @@
-- source: dynbenchmark.qmd
+- source: project
   netlify:
-    - id: 2f67652b-d9de-4e21-9605-89b43a292077
-      url: 'https://strong-salmiakki-5e5a5b.netlify.app'
+    - id: c657513f-7015-46af-b1c3-5bdb84053d84
+      url: 'https://funkyheatmap-experiments.netlify.app'
