@@ -1,0 +1,19 @@
+project:
+  type: website
+  preview:
+    port: 6300
+
+website:
+  title: "Funky Heatmap D3 experiment"
+
+  sidebar:
+    style: docked
+    contents:
+      - funkyheatmap_v0.1.qmd
+
+format:
+  html:
+    theme: simplex
+
+execute:
+  freeze: auto

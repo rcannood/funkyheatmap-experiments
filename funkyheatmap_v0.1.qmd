@@ -1,0 +1,234 @@
+---
+title: "FunkyHeatmapD3 v0.1"
+knitr:
+  opts_chunk: 
+    echo: false
+---
+
+```{r load-data}
+#| include: false
+library(dplyr)
+library(funkyheatmap)
+
+data("dynbenchmark_data")
+
+data <- dynbenchmark_data$data %>% as.data.frame
+column_info <- dynbenchmark_data$column_info
+column_groups <- dynbenchmark_data$column_groups
+row_info <- dynbenchmark_data$row_info
+row_groups <- dynbenchmark_data$row_groups
+palettes <- setNames(
+  dynbenchmark_data$palettes$colours,
+  dynbenchmark_data$palettes$palette
+)
+
+# validate input objects
+data <- verify_data(data)
+column_info <- verify_column_info(column_info, data)
+row_info <- verify_row_info(row_info, data)
+column_groups <- verify_column_groups(column_groups, column_info)
+row_groups <- verify_row_groups(row_groups, row_info)
+palettes <- verify_palettes(palettes, column_info, data)
+# todo: add column groups to verify_palettes
+
+geom_positions <- funkyheatmap:::calculate_geom_positions(
+  data,
+  column_info,
+  row_info,
+  column_groups,
+  row_groups,
+  palettes,
+  scale_column = TRUE,
+  add_abc = TRUE,
+  col_annot_offset = 3,
+  col_annot_angle = 30,
+  removed_entries = NULL
+)
+```
+
+```{r add-defaults}
+if (nrow(geom_positions$segment_data) > 0) {
+  # add defaults for optional values
+  geom_positions$segment_data <- geom_positions$segment_data %>%
+    funkyheatmap:::add_column_if_missing(
+      size = .5,
+      colour = "black",
+      linetype = "solid"
+    )
+}
+if (nrow(geom_positions$rect_data) > 0) {
+  geom_positions$rect_data <- geom_positions$rect_data %>%
+    funkyheatmap:::add_column_if_missing(
+      alpha = 1,
+      border = TRUE,
+      border_colour = "black"
+    ) %>%
+    mutate(
+      border_colour = ifelse(.data$border, .data$border_colour, NA_character_)
+    )
+}
+if (nrow(geom_positions$text_data) > 0) {
+  geom_positions$text_data <- geom_positions$text_data %>%
+    funkyheatmap:::add_column_if_missing(
+      hjust = .5,
+      vjust = .5,
+      size = 4,
+      fontface = "plain",
+      colour = "black",
+      lineheight = 1,
+      angle = 0
+    ) %>%
+    mutate(
+      angle2 = .data$angle / 360 * 2 * pi,
+      cosa = cos(.data$angle2) %>% round(2),
+      sina = sin(.data$angle2) %>% round(2),
+      alphax =
+        ifelse(.data$cosa < 0, 1 - .data$hjust, .data$hjust) * abs(.data$cosa) +
+        ifelse(.data$sina > 0, 1 - .data$vjust, .data$vjust) * abs(.data$sina),
+      alphay =
+        ifelse(.data$sina < 0, 1 - .data$hjust, .data$hjust) * abs(.data$sina) +
+        ifelse(.data$cosa < 0, 1 - .data$vjust, .data$vjust) * abs(.data$cosa),
+      x = (1 - .data$alphax) * .data$xmin + .data$alphax * .data$xmax,
+      y = (1 - .data$alphay) * .data$ymin + .data$alphay * .data$ymax
+    ) %>%
+    filter(.data$label_value != "")
+}
+```
+
+
+```{r pass-data}
+ojs_define(
+  row_pos = geom_positions$row_pos,
+  column_pos = geom_positions$column_pos,
+  segment_data = geom_positions$segment_data,
+  rect_data = geom_positions$rect_data,
+  circle_data = geom_positions$circle_data,
+  funkyrect_data = geom_positions$funkyrect_data,
+  pie_data = geom_positions$pie_data,
+  text_data = geom_positions$text_data,
+  bounds = geom_positions$bounds,
+  viz_params = geom_positions$viz_params,
+)
+```
+
+
+```{ojs}
+//| echo: false
+d3 = require("d3")
+
+{
+  console.log(bounds);
+  const min_x = bounds.minimum_x
+  const max_x = bounds.maximum_x
+  const min_y = bounds.minimum_y
+  const max_y = bounds.maximum_y
+  const width = max_x - max_y;
+  const height = max_y - min_y;
+
+  const svg = d3.create("svg")
+    .attr("viewBox", [0, 0, width, height]);
+
+  // TODO: fill in missing data
+
+  // PLOT ROW BACKGROUNDS
+  const backgrounds = svg.selectAll("backgrounds")
+    .data(transpose(row_pos))
+    .enter().append("rect")
+      .attr("x", 0) // todo: fix
+      .attr("y", function(d) { return max_y - d.ymin - (d.ymax - d.ymin); })
+      .attr("width", width) // todo: fix
+      .attr("height", function(d) { return d.ymax - d.ymin; })
+      .attr("fill", function(d) { return d.colour_background ? "#DDDDDD" : "#00000000"; });
+
+  // PLOT SEGMENTS
+  const segments = svg.selectAll("segment")
+    .data(transpose(segment_data))
+    .enter().append("line")
+      .attr("x1", function(d) { return d.x - min_x; })
+      .attr("x2", function(d) { return d.xend - min_x; })
+      .attr("y1", function(d) { return max_y - d.y; })
+      .attr("y2", function(d) { return max_y - d.yend; })
+      .attr("stroke", function(d) { return d.colour; })
+      .attr("stroke-width", function(d) { return d.size / 5; })
+      .attr("stroke-dasharray", function(d) { 
+        return d.linetype == "dashed" ? ".2 .2" : ""; 
+      });
+
+  // PLOT RECTANGLES
+  const rects = svg.selectAll("rect")
+    .data(transpose(rect_data))
+    .enter().append("rect")
+      .attr("x", function(d) { return d.xmin - min_x; })
+      .attr("y", function(d) { return max_y - d.ymin - (d.ymax - d.ymin); })
+      .attr("width", function(d) { return d.xmax - d.xmin; })
+      .attr("height", function(d) { return d.ymax - d.ymin; })
+      .attr("fill", function(d) { return d.colour; });
+
+  // // PLOT CIRCLES
+  const circles = svg.selectAll("circle")
+    .data(transpose(circle_data))
+    .enter().append("circle")
+      .attr("cx", function(d) { return d.x0 - min_x; })
+      .attr("cy", function(d) { return max_y - d.y0; })
+      .attr("r", function(d) { return d.r; })
+      .attr("fill", function(d) { return d.colour; });
+  
+  // PLOT FUNKY RECTANGLES
+  const funkyrects = svg.selectAll("funkyrect")
+    .data(transpose(funkyrect_data))
+    .enter().append("rect")
+      .attr("x", function(d) { return d.xmin - min_x; })
+      .attr("y", function(d) { return max_y - d.ymin; })
+      .attr("rx", function(d) { return d.r; })
+      .attr("ry", function(d) { return d.r; })
+      .attr("width", function(d) { return d.xmax - d.xmin; })
+      .attr("height", function(d) { return d.ymax - d.ymin; })
+      .attr("fill", function(d) { return d.colour; });
+
+  // PLOT PIES
+  const pies = svg.selectAll("pie")
+    .data(transpose(pie_data))
+    .enter().append("path")
+      .attr("transform", function(d) {
+        return `translate(${d.x0 - min_x},${max_y - d.y0})`;
+      })
+
+      .attr("d", d3.arc()
+          .startAngle(function(d) { return d.rad_start; })
+          .endAngle(function(d) { return d.rad_end; })
+          .outerRadius(function(d) { return d.r; })
+          .innerRadius(function(d) { return d.r0; })
+      )
+      .attr("fill", function(d) { return d.colour; });
+
+  // PLOT TEXT
+  const text = svg.selectAll("text")
+    .data(transpose(text_data))
+    .enter().append("text")
+      .attr("transform", function(d) { return `translate(${d.x - min_x},${max_y - d.y}) rotate(${-d.angle})`; })
+      .text(function(d) { return d.label_value; })
+      .style("text-anchor", function(d) {
+        if (d.hjust == 0.5) {
+          return "middle";
+        } else if (d.hjust < 0.5) {
+          return "start";
+        } else if (d.hjust > 0.5) {
+          return "end";
+        }
+      })
+      .style("dominant-baseline", function(d) {
+        if (d.hjust == 0.5) {
+          return "central";
+        } else if (d.hjust < 0.5) {
+          return "text-bottom";
+        } else if (d.hjust > 0.5) {
+          return "text-top";
+        }
+      })
+      .style("fill", function(d) { return d.colour; })
+      .style("font-size", function(d) { return `${d.size / 7}px`; });
+
+  
+  return svg.node();
+}
+```

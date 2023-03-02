@@ -1,0 +1,4 @@
+- source: dynbenchmark.qmd
+  netlify:
+    - id: 2f67652b-d9de-4e21-9605-89b43a292077
+      url: 'https://strong-salmiakki-5e5a5b.netlify.app'
