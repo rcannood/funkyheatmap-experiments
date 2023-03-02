@@ -235,9 +235,14 @@
     "funkyheatmap": {
       "Package": "funkyheatmap",
       "Version": "0.3.0",
-      "Source": "Repository",
-      "Repository": "CRAN",
-      "Hash": "d59700d785d3f9e03f7ac5e2f41bb6ce",
+      "Source": "GitHub",
+      "RemoteType": "github",
+      "RemoteHost": "api.github.com",
+      "RemoteRepo": "funkyheatmap",
+      "RemoteUsername": "dynverse",
+      "RemoteRef": "HEAD",
+      "RemoteSha": "9f3d43c5ce993fad70bed69a1c48534cc37064b3",
+      "Hash": "40ba18f45d3258d4bb9c3148343cb6c0",
       "Requirements": [
         "RColorBrewer",
         "Rdpack",
